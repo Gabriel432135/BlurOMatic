@@ -19,6 +19,7 @@ package com.example.bluromatic.data
 import android.content.Context
 import android.net.Uri
 import androidx.work.Data
+import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -26,6 +27,8 @@ import com.example.bluromatic.KEY_BLUR_LEVEL
 import com.example.bluromatic.KEY_IMAGE_URI
 import com.example.bluromatic.getImageUri
 import com.example.bluromatic.workers.BlurWorker
+import com.example.bluromatic.workers.CleanupWorker
+import com.example.bluromatic.workers.SaveImageToFileWorker
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -41,11 +44,22 @@ class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
      * @param blurLevel The amount to blur the image
      */
     override fun applyBlur(blurLevel: Int) {
-        val blurRequest = OneTimeWorkRequestBuilder<BlurWorker>()
+        // 1. Inicia a cadeia com o CleanupWorker
+        var continuation = workManager.beginWith(OneTimeWorkRequest.from(CleanupWorker::class.java))
 
-        blurRequest.setInputData(createInputDataForWorkRequest(blurLevel, imageUri))
+        // 2. Prepara o BlurWorker fornecendo a imagem inicial e o nível de blur
+        val blurBuilder = OneTimeWorkRequestBuilder<BlurWorker>()
+        blurBuilder.setInputData(createInputDataForWorkRequest(blurLevel, imageUri))
 
-        workManager.enqueue(blurRequest.build())
+        // 3. Adiciona o BlurWorker na esteira
+        continuation = continuation.then(blurBuilder.build())
+
+        // 4. Cria o SaveImageToFileWorker e adiciona na esteira
+        val save = OneTimeWorkRequestBuilder<SaveImageToFileWorker>().build()
+        continuation = continuation.then(save)
+
+        // 5. Enfileira a esteira completa
+        continuation.enqueue()
     }
 
     /**
