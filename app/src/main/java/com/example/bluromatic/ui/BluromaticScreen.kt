@@ -23,6 +23,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
@@ -34,11 +35,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
@@ -70,6 +74,7 @@ import com.example.bluromatic.ui.theme.BluromaticTheme
 fun BluromaticScreen(blurViewModel: BlurViewModel = viewModel(factory = BlurViewModel.Factory)) {
     val uiState by blurViewModel.blurUiState.collectAsStateWithLifecycle()
     val layoutDirection = LocalLayoutDirection.current
+    val context = LocalContext.current
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -85,7 +90,8 @@ fun BluromaticScreen(blurViewModel: BlurViewModel = viewModel(factory = BlurView
             blurUiState = uiState,
             blurAmountOptions = blurViewModel.blurAmount,
             applyBlur = blurViewModel::applyBlur,
-            cancelWork = {},
+            cancelWork = blurViewModel::cancelWork,
+            onSeeFileClick = { currentUri -> showBlurredImage(context, currentUri) },
             modifier = Modifier
                 .verticalScroll(rememberScrollState())
                 .padding(dimensionResource(R.dimen.padding_medium))
@@ -99,10 +105,10 @@ fun BluromaticScreenContent(
     blurAmountOptions: List<BlurAmount>,
     applyBlur: (Int) -> Unit,
     cancelWork: () -> Unit,
+    onSeeFileClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var selectedValue by rememberSaveable { mutableStateOf(1) }
-    val context = LocalContext.current
     Column(modifier = modifier) {
         Image(
             painter = painterResource(R.drawable.android_cupcake),
@@ -121,8 +127,8 @@ fun BluromaticScreenContent(
         BlurActions(
             blurUiState = blurUiState,
             onStartClick = { applyBlur(selectedValue) },
-            onSeeFileClick = {},
-            onCancelClick = { cancelWork() },
+            onSeeFileClick = onSeeFileClick,
+            onCancelClick = cancelWork,
             modifier = Modifier.fillMaxWidth()
         )
     }
@@ -140,11 +146,45 @@ private fun BlurActions(
         modifier = modifier,
         horizontalArrangement = Arrangement.Center
     ) {
-        Button(
-            onClick = onStartClick,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(stringResource(R.string.start))
+        when (blurUiState) {
+            is BlurUiState.Default -> {
+                Button(
+                    onClick = onStartClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.start))
+                }
+            }
+            is BlurUiState.Loading -> {
+                FilledTonalButton(
+                    onClick = onCancelClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.cancel_work))
+                }
+                CircularProgressIndicator(
+                    modifier = Modifier.padding(dimensionResource(R.dimen.padding_small))
+                )
+            }
+            is BlurUiState.Complete -> {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = onStartClick,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(stringResource(R.string.start))
+                    }
+                    if (blurUiState.outputUri.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(dimensionResource(R.dimen.padding_small)))
+                        FilledTonalButton(
+                            onClick = { onSeeFileClick(blurUiState.outputUri) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(R.string.see_file))
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -206,6 +246,7 @@ fun BluromaticScreenContentPreview() {
         BluromaticScreenContent(
             blurUiState = BlurUiState.Default,
             blurAmountOptions = listOf(BlurAmount(R.string.blur_lv_1, 1)),
+            {},
             {},
             {},
             modifier = Modifier.padding(16.dp)
