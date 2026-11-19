@@ -19,6 +19,7 @@ package com.example.bluromatic.data
 import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.asFlow
+import androidx.work.Constraints
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
@@ -51,6 +52,10 @@ class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
      * @param blurLevel The amount to blur the image
      */
     override fun applyBlur(blurLevel: Int) {
+        val constraint = Constraints.Builder()
+            .setRequiresBatteryNotLow(true)
+            .build()
+
         // 1. Inicia a cadeia com o CleanupWorker
         var continuation = workManager.beginUniqueWork(
             IMAGE_MANIPULATION_WORK_NAME,
@@ -60,7 +65,9 @@ class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
 
         // 2. Prepara o BlurWorker fornecendo a imagem inicial e o nível de blur
         val blurBuilder = OneTimeWorkRequestBuilder<BlurWorker>()
-        blurBuilder.setInputData(createInputDataForWorkRequest(blurLevel, imageUri))
+        blurBuilder
+            .setInputData(createInputDataForWorkRequest(blurLevel, imageUri))
+            .setConstraints(constraint)
 
         // 3. Adiciona o BlurWorker na esteira
         continuation = continuation.then(blurBuilder.build())
