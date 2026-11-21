@@ -65,4 +65,11 @@ dependencies {
 
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+
+    // Espresso
+    androidTestImplementation(libs.androidx.espresso.core.v351)
+    // Junit
+    androidTestImplementation(libs.androidx.junit.v115)
+    // Work testing
+    androidTestImplementation(libs.androidx.work.testing)
 }
